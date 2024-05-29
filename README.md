@@ -43,7 +43,7 @@ Install `Requirements`
 
 * 0.1.0
     * The first proper release
-    * CREATE: **tcp** ratelimit
+    * CREATE: **TCP** ratelimit
 
 * 0.2.0
     * ADD: **TCP** conntrack

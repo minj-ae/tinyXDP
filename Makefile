@@ -2,23 +2,19 @@ BPFTOOL ?= bpftool
 CLANG ?= clang -g
 LLVM_STRIP ?= llvm-strip
 
-# Specify the default network interface, can be overridden by the command line
 INTERFACE ?= eth0
 
-# Add your source files here
 SOURCES = ./modules/tcp.c
 OBJECTS = $(SOURCES:.c=.o)
 
-# Kernel headers directory, adjust this if needed
 #KERNEL_HEADERS = /usr/src/linux-headers-$(shell uname -r)
 
-# BPF headers directory
 BPF_HEADERS = ./libbpf/src
 
 #CFLAGS = -O2 -Wall -Werror -Wno-address-of-packed-member -I$(KERNEL_HEADERS)/include -I$(KERNEL_HEADERS)/arch/x86/include -I$(BPF_HEADERS)
 CFLAGS = -O2 -Wall -Werror -Wno-address-of-packed-member -I$(BPF_HEADERS)
 
-.PHONY: all clean load unload
+.PHONY: all clean load unload attach detach ip
 
 all: $(OBJECTS)
 
@@ -48,3 +44,26 @@ detach:
 	$(foreach obj, $(OBJECTS), \
 		sudo $(BPFTOOL) net detach xdp dev $(INTERFACE); \
 	)
+
+ip:
+	@/bin/bash -c ' \
+	if [ -z "$(ACTION)" ] || [ -z "$(IP)" ]; then \
+		echo "Usage: make ip ACTION=<add|remove> IP=<IP_ADDRESS>"; \
+		exit 1; \
+	fi; \
+	map_id=$$(sudo $(BPFTOOL) map show | grep -w whitelist_map | awk "{print \$$1}" | cut -d: -f1); \
+	if [ -z "$$map_id" ]; then \
+		echo "whitelist_map not found"; \
+		exit 1; \
+	fi; \
+	if [ "$(ACTION)" = "add" ]; then \
+		ip=$(IP); \
+		key=$$(printf "%02X %02X %02X %02X" $${ip//./ }); \
+		sudo $(BPFTOOL) map update id $$map_id key hex $$key value hex 01; \
+	elif [ "$(ACTION)" = "remove" ]; then \
+		ip=$(IP); \
+		key=$$(printf "%02X %02X %02X %02X" $${ip//./ }); \
+		sudo $(BPFTOOL) map delete id $$map_id key hex $$key; \
+	else \
+		echo "Invalid action: $(ACTION). Use 'add' or 'remove'."; \
+	fi'

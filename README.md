@@ -45,6 +45,11 @@ Install `Requirements`
     * The first proper release
     * CREATE: **tcp** ratelimit
 
+* 0.2.0
+    * ADD: **TCP** conntrack
+    * ADD: **TCP** bogon FLAG check
+    * ADD: endpoint ip whitelist adder
+
 ## Meta
 
 Minjae Kim – [minj.ae](https://minj.ae) – minjae@minj.ae

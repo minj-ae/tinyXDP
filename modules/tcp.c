@@ -24,7 +24,7 @@
 
 #define MAX_SYN_RATE_LIMIT 1
 #define MAX_SYNACK_RATE_LIMIT 60
-#define MAX_ACK_RATE_LIMIT 3500
+#define MAX_ACK_RATE_LIMIT 6000
 #define MAX_RST_RATE_LIMIT 1
 #define MAX_FIN_RATE_LIMIT 1
 
@@ -32,7 +32,15 @@
 
 enum conn_state {
     CONN_NEW,
+    CONN_SYN_SENT,
+    CONN_SYN_RECEIVED,
     CONN_ESTABLISHED,
+    CONN_FIN_WAIT_1,
+    CONN_FIN_WAIT_2,
+    CONN_TIME_WAIT,
+    CONN_CLOSE,
+    CONN_CLOSE_WAIT,
+    CONN_LAST_ACK,
     CONN_RELATED,
     CONN_INVALID,
 };
@@ -54,7 +62,7 @@ struct {
 } conntrack_map SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __uint(max_entries, MAX_MAP_ENTRIES);
     __type(key, __u64);
     __type(value, struct {
@@ -64,7 +72,7 @@ struct {
 } syn_flood_map SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __uint(max_entries, MAX_MAP_ENTRIES);
     __type(key, __u64);
     __type(value, struct {
@@ -74,7 +82,7 @@ struct {
 } sack_flood_map SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __uint(max_entries, MAX_MAP_ENTRIES);
     __type(key, __u64);
     __type(value, struct {
@@ -84,7 +92,7 @@ struct {
 } ack_flood_map SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __uint(max_entries, MAX_MAP_ENTRIES);
     __type(key, __u64);
     __type(value, struct {
@@ -94,7 +102,7 @@ struct {
 } rst_flood_map SEC(".maps");
 
 struct {
-    __uint(type, BPF_MAP_TYPE_PERCPU_HASH);
+    __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __uint(max_entries, MAX_MAP_ENTRIES);
     __type(key, __u64);
     __type(value, struct {
@@ -143,49 +151,85 @@ static __always_inline int rate_limit(__u32 ip, __u16 flags, __u64 max_rate_limi
     return XDP_PASS;
 }
 
-static __always_inline enum conn_state get_conn_state(struct tcphdr *tcp) {
-    if (tcp->syn && !tcp->ack)
-        return CONN_NEW;
-    if (tcp->syn && tcp->ack)
-        return CONN_ESTABLISHED;
-    if (tcp->fin || tcp->rst)
-        return CONN_INVALID;
-    if (tcp->ack)
-        return CONN_ESTABLISHED;
-    return CONN_INVALID;
+static __always_inline enum conn_state get_conn_state(enum conn_state current_state, __u16 flags) {
+    switch (current_state) {
+        case CONN_NEW:
+            if (flags & TH_SYN)
+                return CONN_SYN_SENT;
+            break;
+        case CONN_SYN_SENT:
+            if (flags & TH_SYN && flags & TH_ACK)
+                return CONN_SYN_RECEIVED;
+            break;
+        case CONN_SYN_RECEIVED:
+            if (flags & TH_ACK)
+                return CONN_ESTABLISHED;
+            break;
+        case CONN_ESTABLISHED:
+            if (flags & TH_FIN)
+                return CONN_FIN_WAIT_1;
+            if (flags & TH_RST)
+                return CONN_CLOSE;
+            break;
+        case CONN_FIN_WAIT_1:
+            if (flags & TH_ACK)
+                return CONN_FIN_WAIT_2;
+            if (flags & TH_FIN)
+                return CONN_TIME_WAIT;
+            break;
+        case CONN_FIN_WAIT_2:
+            if (flags & TH_FIN)
+                return CONN_TIME_WAIT;
+            break;
+        case CONN_TIME_WAIT:
+            if (flags & TH_ACK)
+                return CONN_CLOSE;
+            break;
+        case CONN_CLOSE_WAIT:
+            if (flags & TH_FIN)
+                return CONN_LAST_ACK;
+            break;
+        case CONN_LAST_ACK:
+            if (flags & TH_ACK)
+                return CONN_CLOSE;
+            break;
+        default:
+            return CONN_INVALID;
+    }
+    return current_state;
 }
 
 static __always_inline int check_tcp_flags(__u16 flags) {
     if ((flags & (TH_FIN | TH_SYN | TH_RST | TH_PUSH | TH_ACK | TH_URG)) == 0)
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_FIN | TH_SYN)) == (TH_FIN | TH_SYN))
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_SYN | TH_RST)) == (TH_SYN | TH_RST))
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_SYN | TH_FIN)) == (TH_SYN | TH_FIN))
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_FIN | TH_RST)) == (TH_FIN | TH_RST))
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_ACK | TH_FIN)) == TH_FIN)
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_ACK | TH_URG)) == TH_URG)
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_ACK | TH_FIN)) == TH_FIN)
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_ACK | TH_PUSH)) == TH_PUSH)
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_FIN | TH_SYN | TH_RST | TH_PUSH | TH_ACK | TH_URG)) == (TH_FIN | TH_SYN | TH_RST | TH_PUSH | TH_ACK | TH_URG))
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_FIN | TH_SYN | TH_RST | TH_PUSH | TH_ACK | TH_URG)) == 0)
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_FIN | TH_PUSH | TH_URG)) == (TH_FIN | TH_PUSH | TH_URG))
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_SYN | TH_FIN | TH_PUSH | TH_URG)) == (TH_SYN | TH_FIN | TH_PUSH | TH_URG))
-        return XDP_DROP;
+        return 0;
     if ((flags & (TH_SYN | TH_RST | TH_ACK | TH_FIN | TH_URG)) == (TH_SYN | TH_RST | TH_ACK | TH_FIN | TH_URG))
-        return XDP_DROP;
+        return 0;
 
-    return XDP_PASS;
+    return 1;
 }
 
 SEC("xdp")
@@ -222,23 +266,27 @@ int tinyxdp_base(struct xdp_md *ctx) {
 
             __u16 flags = ((__u16)tcp->fin) | ((__u16)tcp->syn << 1) | ((__u16)tcp->rst << 2) | ((__u16)tcp->psh << 3) |
                           ((__u16)tcp->ack << 4) | ((__u16)tcp->urg << 5);
-            if (check_tcp_flags(flags) == XDP_DROP)
+            if (check_tcp_flags(flags) == 0)
                 return XDP_DROP;
 
             struct conn_info *conn = bpf_map_lookup_elem(&conntrack_map, &conn_key);
-            enum conn_state state = get_conn_state(tcp);
+            enum conn_state state;
             if (!conn) {
+                if (!(flags & TH_SYN)) {
+                    return XDP_DROP;
+                }
                 struct conn_info new_conn = {
                     .src_ip = src_ip,
                     .dst_ip = dst_ip,
                     .src_port = src_port,
                     .dst_port = dst_port,
-                    .state = state,
+                    .state = CONN_NEW,
                     .last_seen = bpf_ktime_get_ns()
                 };
                 bpf_map_update_elem(&conntrack_map, &conn_key, &new_conn, BPF_ANY);
                 conn = bpf_map_lookup_elem(&conntrack_map, &conn_key);
             } else {
+                state = get_conn_state(conn->state, flags);
                 conn->last_seen = bpf_ktime_get_ns();
                 conn->state = state;
             }
@@ -247,8 +295,20 @@ int tinyxdp_base(struct xdp_md *ctx) {
                 switch (conn->state) {
                     case CONN_NEW:
                         return rate_limit(src_ip, tcp->th_flags, MAX_SYN_RATE_LIMIT, &syn_flood_map);
+                    case CONN_SYN_SENT:
+                        return rate_limit(src_ip, tcp->th_flags, MAX_SYNACK_RATE_LIMIT, &sack_flood_map);
+                    case CONN_SYN_RECEIVED:
+                        return rate_limit(src_ip, tcp->th_flags, MAX_SYNACK_RATE_LIMIT, &sack_flood_map);
                     case CONN_ESTABLISHED:
-                        return rate_limit(src_ip, tcp->th_flags, MAX_ACK_RATE_LIMIT, &ack_flood_map);
+                        return XDP_PASS;
+                    case CONN_FIN_WAIT_1:
+                    case CONN_FIN_WAIT_2:
+                    case CONN_TIME_WAIT:
+                        return rate_limit(src_ip, tcp->th_flags, MAX_FIN_RATE_LIMIT, &fin_flood_map);
+                    case CONN_CLOSE:
+                    case CONN_CLOSE_WAIT:
+                    case CONN_LAST_ACK:
+                        return rate_limit(src_ip, tcp->th_flags, MAX_RST_RATE_LIMIT, &rst_flood_map);
                     case CONN_RELATED:
                         return XDP_PASS;
                     case CONN_INVALID:

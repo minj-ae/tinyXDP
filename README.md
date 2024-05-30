@@ -30,6 +30,16 @@ make unload
 make detach INTERFACE=yourinterfacename
 ```
 
+To whitelist server endpoint IP, type
+```sh
+make ip ACTION=add IP=x.x.x.x
+```
+
+To remove IP from whitelist, type
+```sh
+make ip ACTION=remove IP=x.x.x.x
+```
+
 ## Development setup
 
 Install `Requirements`

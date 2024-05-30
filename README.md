@@ -49,6 +49,10 @@ Install `Requirements`
     * ADD: **TCP** conntrack
     * ADD: **TCP** bogon FLAG check
     * ADD: endpoint ip whitelist adder
+ 
+* 0.2.1
+    * ADD: **TCP** conntrack advanced
+    * EDIT: Change bogon FLAG check logic
 
 ## Meta
 

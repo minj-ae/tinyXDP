@@ -4,7 +4,7 @@ LLVM_STRIP ?= llvm-strip
 
 INTERFACE ?= eth0
 
-SOURCES = ./modules/tcp.c
+SOURCES = ./modules/base.c
 OBJECTS = $(SOURCES:.c=.o)
 
 #KERNEL_HEADERS = /usr/src/linux-headers-$(shell uname -r)
@@ -37,7 +37,7 @@ unload: $(OBJECTS)
 
 attach: $(OBJECTS)
 	$(foreach obj, $(OBJECTS), \
-		sudo $(BPFTOOL) net attach xdp name tinyxdp_base dev $(INTERFACE); \
+		sudo $(BPFTOOL) net attach xdp name tinyxdp_$(basename $(notdir $(obj))) dev $(INTERFACE); \
 	)
 
 detach:
@@ -45,25 +45,34 @@ detach:
 		sudo $(BPFTOOL) net detach xdp dev $(INTERFACE); \
 	)
 
+
 ip:
 	@/bin/bash -c ' \
-	if [ -z "$(ACTION)" ] || [ -z "$(IP)" ]; then \
-		echo "Usage: make ip ACTION=<add|remove> IP=<IP_ADDRESS>"; \
+	source ./ip_utils.sh; \
+	if [ -z "$(ACTION)" ] || [ -z "$(NETWORK)" ] || [ -z "$(MASK)" ]; then \
+		echo "Usage: make ip ACTION=<add|remove> NETWORK=<NETWORK_ADDRESS> MASK=<SUBNET_MASK>"; \
 		exit 1; \
 	fi; \
-	map_id=$$(sudo $(BPFTOOL) map show | grep -w whitelist_map | awk "{print \$$1}" | cut -d: -f1); \
+	map_id=$$(sudo bpftool map show | grep -w whitelist_map | awk "{print \$$1}" | cut -d: -f1); \
 	if [ -z "$$map_id" ]; then \
 		echo "whitelist_map not found"; \
 		exit 1; \
 	fi; \
+	network=$$(ip_to_hex $(NETWORK)); \
+	prefix_len=$$(mask_to_prefix $(MASK)); \
+	key="0x$$(printf "%02x" $$prefix_len) 0x00 0x00 0x00 0x$${network:0:2} 0x$${network:2:2} 0x$${network:4:2} 0x$${network:6:2}"; \
+	echo "Debug: map_id=$$map_id"; \
+	echo "Debug: key=$$key"; \
 	if [ "$(ACTION)" = "add" ]; then \
-		ip=$(IP); \
-		key=$$(printf "%02X %02X %02X %02X" $${ip//./ }); \
-		sudo $(BPFTOOL) map update id $$map_id key hex $$key value hex 01; \
+		echo "Debug: Executing command:"; \
+		echo "sudo bpftool map update id $$map_id key $$key value 0x01 0x00 0x00 0x00"; \
+		sudo bpftool map update id $$map_id key $$key value 0x01 0x00 0x00 0x00; \
+		echo "Added network $(NETWORK)/$$prefix_len to whitelist"; \
 	elif [ "$(ACTION)" = "remove" ]; then \
-		ip=$(IP); \
-		key=$$(printf "%02X %02X %02X %02X" $${ip//./ }); \
-		sudo $(BPFTOOL) map delete id $$map_id key hex $$key; \
+		echo "Debug: Executing command:"; \
+		echo "sudo bpftool map delete id $$map_id key $$key"; \
+		sudo bpftool map delete id $$map_id key $$key; \
+		echo "Removed network $(NETWORK)/$$prefix_len from whitelist"; \
 	else \
-		echo "Invalid action: $(ACTION). Use 'add' or 'remove'."; \
+		echo "Invalid action: $(ACTION). Use '\''add'\'' or '\''remove'\''."; \
 	fi'

@@ -33,6 +33,50 @@
 #define MAX_NTP_RATE_LIMIT 2
 #define MAX_DHCP_RATE_LIMIT 5
 #define MAX_DEFAULT_RATE_LIMIT 1000
+#define MAX_UBIQUITI_RATE_LIMIT 10
+#define MAX_TP240_RATE_LIMIT 5
+#define MAX_PORTMAP_RATE_LIMIT 20
+#define MAX_MEMCACHED_RATE_LIMIT 3
+#define MAX_OPENVPN_RATE_LIMIT 50
+#define MAX_NETBIOS_RATE_LIMIT 15
+#define MAX_MSSQL_RATE_LIMIT 5
+#define MAX_CITRIX_RATE_LIMIT 30
+#define MAX_SNMP_RATE_LIMIT 10
+#define MAX_QOTD_RATE_LIMIT 2
+#define MAX_VXWORKS_RATE_LIMIT 5
+#define MAX_XDMCP_RATE_LIMIT 5
+#define MAX_SSDP_RATE_LIMIT 5
+#define MAX_POWERHOUSE_RATE_LIMIT 10
+#define MAX_DIGIMAN_RATE_LIMIT 5
+#define MAX_SRCDS_RATE_LIMIT 20
+#define MAX_STEAM_REMOTE_PLAY_RATE_LIMIT 30
+#define MAX_QUAKE3_RATE_LIMIT 25
+#define MAX_FIVEM_RATE_LIMIT 15
+#define MAX_LANTRONIX_RATE_LIMIT 5
+#define MAX_PLEX_RATE_LIMIT 20
+#define MAX_ARD_RATE_LIMIT 10
+#define MAX_JENKINS_RATE_LIMIT 15
+#define MAX_RDP_RATE_LIMIT 40
+#define MAX_STUN_RATE_LIMIT 50
+#define MAX_WSD_RATE_LIMIT 10
+#define MAX_DAHUA_RATE_LIMIT 5
+#define MAX_BFD_RATE_LIMIT 20
+#define MAX_CLDAP_RATE_LIMIT 5
+#define MAX_CRESTRON_RATE_LIMIT 10
+#define MAX_SLP_RATE_LIMIT 15
+#define MAX_DTLS_RATE_LIMIT 30
+#define MAX_IPSEC_RATE_LIMIT 25
+#define MAX_MODBUS_RATE_LIMIT 20
+#define MAX_SIP_RATE_LIMIT 40
+#define MAX_SENTINEL_RATE_LIMIT 10
+#define MAX_NETIS_RATE_LIMIT 5
+#define MAX_NATPMP_RATE_LIMIT 15
+#define MAX_COAP_RATE_LIMIT 20
+#define MAX_BITTORRENT_DHT_RATE_LIMIT 50
+#define MAX_AFS_RATE_LIMIT 10
+#define MAX_HTTP_RATE_LIMIT 100
+#define MAX_QUIC_RATE_LIMIT 50
+
 
 enum conn_state {
     CONN_NEW,
@@ -393,15 +437,55 @@ static __always_inline int process_udp(struct xdp_md *ctx, struct iphdr *ip, str
 
     // Apply smart rate limiting based on source port (protocol)
     switch (src_port) {
-        case 53:  // DNS
-            return smart_rate_limit(src_ip, src_port, packet_size, MAX_DNS_RATE_LIMIT);
-        case 123: // NTP
-            return smart_rate_limit(src_ip, src_port, packet_size, MAX_NTP_RATE_LIMIT);
-        case 67:  // DHCP
-        case 68:
-            return smart_rate_limit(src_ip, src_port, packet_size, MAX_DHCP_RATE_LIMIT);
-        default:
-            return smart_rate_limit(src_ip, src_port, packet_size, MAX_DEFAULT_RATE_LIMIT);
+        case 53: return smart_rate_limit(src_ip, src_port, packet_size, MAX_DNS_RATE_LIMIT);
+        case 123: return smart_rate_limit(src_ip, src_port, packet_size, MAX_NTP_RATE_LIMIT);
+        case 67:
+        case 68: return smart_rate_limit(src_ip, src_port, packet_size, MAX_DHCP_RATE_LIMIT);
+        case 10001: return smart_rate_limit(src_ip, src_port, packet_size, MAX_UBIQUITI_RATE_LIMIT);
+        case 10074: return smart_rate_limit(src_ip, src_port, packet_size, MAX_TP240_RATE_LIMIT);
+        case 111: return smart_rate_limit(src_ip, src_port, packet_size, MAX_PORTMAP_RATE_LIMIT);
+        case 11211: return smart_rate_limit(src_ip, src_port, packet_size, MAX_MEMCACHED_RATE_LIMIT);
+        case 1194: return smart_rate_limit(src_ip, src_port, packet_size, MAX_OPENVPN_RATE_LIMIT);
+        case 137: return smart_rate_limit(src_ip, src_port, packet_size, MAX_NETBIOS_RATE_LIMIT);
+        case 1434: return smart_rate_limit(src_ip, src_port, packet_size, MAX_MSSQL_RATE_LIMIT);
+        case 1604: return smart_rate_limit(src_ip, src_port, packet_size, MAX_CITRIX_RATE_LIMIT);
+        case 161: return smart_rate_limit(src_ip, src_port, packet_size, MAX_SNMP_RATE_LIMIT);
+        case 17: return smart_rate_limit(src_ip, src_port, packet_size, MAX_QOTD_RATE_LIMIT);
+        case 17185: return smart_rate_limit(src_ip, src_port, packet_size, MAX_VXWORKS_RATE_LIMIT);
+        case 177: return smart_rate_limit(src_ip, src_port, packet_size, MAX_XDMCP_RATE_LIMIT);
+        case 1900: return smart_rate_limit(src_ip, src_port, packet_size, MAX_SSDP_RATE_LIMIT);
+        case 20811: return smart_rate_limit(src_ip, src_port, packet_size, MAX_POWERHOUSE_RATE_LIMIT);
+        case 2362: return smart_rate_limit(src_ip, src_port, packet_size, MAX_DIGIMAN_RATE_LIMIT);
+        case 27015: 
+        case 27016:
+        case 27017: return smart_rate_limit(src_ip, src_port, packet_size, MAX_SRCDS_RATE_LIMIT);
+        case 27036: return smart_rate_limit(src_ip, src_port, packet_size, MAX_STEAM_REMOTE_PLAY_RATE_LIMIT);
+        case 27960: return smart_rate_limit(src_ip, src_port, packet_size, MAX_QUAKE3_RATE_LIMIT);
+        case 30120: return smart_rate_limit(src_ip, src_port, packet_size, MAX_FIVEM_RATE_LIMIT);
+        case 30718: return smart_rate_limit(src_ip, src_port, packet_size, MAX_LANTRONIX_RATE_LIMIT);
+        case 32414: return smart_rate_limit(src_ip, src_port, packet_size, MAX_PLEX_RATE_LIMIT);
+        case 3283: return smart_rate_limit(src_ip, src_port, packet_size, MAX_ARD_RATE_LIMIT);
+        case 33848: return smart_rate_limit(src_ip, src_port, packet_size, MAX_JENKINS_RATE_LIMIT);
+        case 3389: return smart_rate_limit(src_ip, src_port, packet_size, MAX_RDP_RATE_LIMIT);
+        case 3478: return smart_rate_limit(src_ip, src_port, packet_size, MAX_STUN_RATE_LIMIT);
+        case 3702: return smart_rate_limit(src_ip, src_port, packet_size, MAX_WSD_RATE_LIMIT);
+        case 37810: return smart_rate_limit(src_ip, src_port, packet_size, MAX_DAHUA_RATE_LIMIT);
+        case 3784: return smart_rate_limit(src_ip, src_port, packet_size, MAX_BFD_RATE_LIMIT);
+        case 389: return smart_rate_limit(src_ip, src_port, packet_size, MAX_CLDAP_RATE_LIMIT);
+        case 41794: return smart_rate_limit(src_ip, src_port, packet_size, MAX_CRESTRON_RATE_LIMIT);
+        case 427: return smart_rate_limit(src_ip, src_port, packet_size, MAX_SLP_RATE_LIMIT);
+        case 443: return smart_rate_limit(src_ip, src_port, packet_size, MAX_DTLS_RATE_LIMIT);
+        case 500: return smart_rate_limit(src_ip, src_port, packet_size, MAX_IPSEC_RATE_LIMIT);
+        case 502: return smart_rate_limit(src_ip, src_port, packet_size, MAX_MODBUS_RATE_LIMIT);
+        case 5060: return smart_rate_limit(src_ip, src_port, packet_size, MAX_SIP_RATE_LIMIT);
+        case 5093: return smart_rate_limit(src_ip, src_port, packet_size, MAX_SENTINEL_RATE_LIMIT);
+        case 53413: return smart_rate_limit(src_ip, src_port, packet_size, MAX_NETIS_RATE_LIMIT);
+        case 5351: return smart_rate_limit(src_ip, src_port, packet_size, MAX_NATPMP_RATE_LIMIT);
+        case 5683: return smart_rate_limit(src_ip, src_port, packet_size, MAX_COAP_RATE_LIMIT);
+        case 6881: return smart_rate_limit(src_ip, src_port, packet_size, MAX_BITTORRENT_DHT_RATE_LIMIT);
+        case 7001: return smart_rate_limit(src_ip, src_port, packet_size, MAX_AFS_RATE_LIMIT);
+        case 80: return smart_rate_limit(src_ip, src_port, packet_size, MAX_HTTP_RATE_LIMIT);
+	default: return smart_rate_limit(src_ip, src_port, packet_size, MAX_DEFAULT_RATE_LIMIT);
     }
 }
 

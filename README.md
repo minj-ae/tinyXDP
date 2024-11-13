@@ -63,6 +63,11 @@ Install `Requirements`
 * 0.2.1
     * ADD: **TCP** conntrack advanced
     * EDIT: Change bogon FLAG check logic
+ 
+* 0.3.0
+    * ADD: GRE support
+    * ADD: TCP Strict overload logic
+    * ADD: UDP Strict overload logic based detection
 
 ## Meta
 

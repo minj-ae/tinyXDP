@@ -12,7 +12,7 @@ OBJECTS = $(SOURCES:.c=.o)
 BPF_HEADERS = ./libbpf/src
 
 #CFLAGS = -O2 -Wall -Werror -Wno-address-of-packed-member -I$(KERNEL_HEADERS)/include -I$(KERNEL_HEADERS)/arch/x86/include -I$(BPF_HEADERS)
-CFLAGS = -O2 -Wall -Werror -Wno-address-of-packed-member -I$(BPF_HEADERS)
+CFLAGS = -O2 -Wall -Werror -Wno-address-of-packed-member -Wno-unused-variable -I$(BPF_HEADERS)
 
 .PHONY: all clean load unload attach detach ip
 

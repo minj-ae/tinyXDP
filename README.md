@@ -10,7 +10,7 @@ The purpose is to mitigate DDoS by clearing traffic exceeding the rate limit thr
 ### Debian
 
 ```sh
-
+sudo apt install clang llvm libelf-dev libpcap-dev build-essential libc6-dev-i386 linux-perf linux-headers-$(uname -r) bpftool tcpdump
 ```
 
 
